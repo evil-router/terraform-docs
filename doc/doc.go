@@ -73,7 +73,14 @@ type inputsByName []Input
 
 func (a inputsByName) Len() int           { return len(a) }
 func (a inputsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a inputsByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+func (a inputsByName) Less(i, j int) bool { return a[i].Name < a[j].Name  }
+
+type inputsByRequired []Input
+
+func (a inputsByRequired) Len() int           { return len(a) }
+func (a inputsByRequired) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a inputsByRequired) Less(i, j int) bool { return a[i].Default == nil && a[j].Default != nil }
+
 
 type modulesByName [] Module
 
@@ -107,7 +114,6 @@ func Create(files map[string]*ast.File) *Doc {
 		doc.Modules = append(doc.Modules, modules(list)...)
 		filename := path.Base(name)
 		comments := f.Comments
-
 		if (filename == "main.tf"  || filename == "tfvars.tf") && len(comments) > 0 {
 			doc.Comment = header(comments[0])
 		}
@@ -116,6 +122,7 @@ func Create(files map[string]*ast.File) *Doc {
 	sort.Sort(modulesByName(doc.Modules))
 	sort.Sort(outputsByName(doc.Outputs))
 	sort.Sort(providersByName(doc.Providers))
+	sort.Sort(inputsByRequired(doc.Inputs))
 	return doc
 }
 
