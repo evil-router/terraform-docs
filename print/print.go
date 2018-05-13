@@ -45,7 +45,28 @@ func Pretty(d *doc.Doc) (string, error) {
 
 		buf.WriteString("\n")
 	}
+	if len(d.Modules) > 0 {
+		buf.WriteString("\n")
 
+		for _, i := range d.Modules {
+			format := "  \033[36mvar.%s\033[0m \n Source: %s\n  \033[90m%s\033[0m\n\n"
+			s := fmt.Sprintf(format, i.Name, i.Source ,strings.TrimSpace(i.Description))
+			buf.WriteString(s)
+		}
+
+		buf.WriteString("\n")
+	}
+	if len(d.Providers) > 0 {
+		buf.WriteString("\n")
+
+		for _, i := range d.Providers {
+			format := "  \033[36mvar.%s\033[0m\n Version: %s\n  \033[90m%s\033[0m\n\n"
+			s := fmt.Sprintf(format, i.Name, i.Verison ,strings.TrimSpace(i.Description))
+			buf.WriteString(s)
+		}
+
+		buf.WriteString("\n")
+	}
 	return buf.String(), nil
 }
 
@@ -108,6 +129,34 @@ func Markdown(d *doc.Doc, printRequired bool) (string, error) {
 		buf.WriteString(fmt.Sprintf("| %s | %s |\n",
 			v.Name,
 			normalizeMarkdownDesc(v.Description)))
+	}
+
+	if len(d.Modules) > 0 {
+		buf.WriteString("\n## Modules\n\n")
+		buf.WriteString("| Name | Description | Source |\n")
+		buf.WriteString("|------|-------------|--------|\n")
+	}
+
+	for _, v := range d.Modules {
+		buf.WriteString(fmt.Sprintf("| %s | %s | %s |\n",
+			v.Name,
+			normalizeMarkdownDesc(v.Description),
+			v.Source,
+		))
+	}
+
+	if len(d.Providers) > 0 {
+		buf.WriteString("\n## Providers\n\n")
+		buf.WriteString("| Name | Description | Version |\n")
+		buf.WriteString("|------|-------------|--------|\n")
+	}
+
+	for _, v := range d.Providers {
+		buf.WriteString(fmt.Sprintf("| %s | %s | %s |\n",
+			v.Name,
+			normalizeMarkdownDesc(v.Description),
+			v.Verison,
+		))
 	}
 
 	return buf.String(), nil

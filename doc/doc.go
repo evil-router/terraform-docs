@@ -16,6 +16,12 @@ type Input struct {
 	Default     *Value
 	Type        string
 }
+// Input represents a terraform input variable.
+type Module struct {
+	Name        string
+	Description string
+	Source      string
+}
 
 // Value returns the default value as a string.
 func (i *Input) Value() string {
@@ -45,11 +51,22 @@ type Output struct {
 	Description string
 }
 
+//Provider represents a provider in a terraform project
+// Output represents a terraform output.
+type Provider struct {
+	Name        string
+	Description string
+	Verison     string
+
+}
+
 // Doc represents a terraform module doc.
 type Doc struct {
 	Comment string
 	Inputs  []Input
+	Modules [] Module
 	Outputs []Output
+	Providers []Provider
 }
 
 type inputsByName []Input
@@ -58,11 +75,24 @@ func (a inputsByName) Len() int           { return len(a) }
 func (a inputsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a inputsByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
+type modulesByName [] Module
+
+func (a modulesByName) Len() int           { return len(a) }
+func (a modulesByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a modulesByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
 type outputsByName []Output
 
 func (a outputsByName) Len() int           { return len(a) }
 func (a outputsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a outputsByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+type providersByName []Provider
+
+func (a providersByName) Len() int           { return len(a) }
+func (a providersByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a providersByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
 
 // Create creates a new *Doc from the supplied map
 // of filenames and *ast.File.
@@ -73,16 +103,19 @@ func Create(files map[string]*ast.File) *Doc {
 		list := f.Node.(*ast.ObjectList)
 		doc.Inputs = append(doc.Inputs, inputs(list)...)
 		doc.Outputs = append(doc.Outputs, outputs(list)...)
-
+		doc.Providers = append(doc.Providers, providers(list)...)
+		doc.Modules = append(doc.Modules, modules(list)...)
 		filename := path.Base(name)
 		comments := f.Comments
 
-		if filename == "main.tf" && len(comments) > 0 {
+		if (filename == "main.tf"  || filename == "tfvars.tf") && len(comments) > 0 {
 			doc.Comment = header(comments[0])
 		}
 	}
 	sort.Sort(inputsByName(doc.Inputs))
+	sort.Sort(modulesByName(doc.Modules))
 	sort.Sort(outputsByName(doc.Outputs))
+	sort.Sort(providersByName(doc.Providers))
 	return doc
 }
 
@@ -128,6 +161,36 @@ func inputs(list *ast.ObjectList) []Input {
 }
 
 // Outputs returns all outputs from `list`.
+func modules(list *ast.ObjectList) [] Module{
+	var ret []Module
+
+	for _, item := range list.Items {
+		if is(item, "module") {
+			name, _ := strconv.Unquote(item.Keys[1].Token.Text)
+			if name == "" {
+				name = item.Keys[1].Token.Text
+			}
+			items := item.Val.(*ast.ObjectType).List.Items
+			var desc string
+			switch {
+			case description(items) != "":
+				desc = description(items)
+			case item.LeadComment != nil:
+				desc = comment(item.LeadComment.List)
+			}
+			source := get(items,"source")
+			ret = append(ret, Module{
+				Name:        name,
+				Description: desc,
+				Source: strings.TrimSpace(source.Literal),
+			})
+		}
+	}
+
+	return ret
+}
+
+// Outputs returns all outputs from `list`.
 func outputs(list *ast.ObjectList) []Output {
 	var ret []Output
 
@@ -149,6 +212,40 @@ func outputs(list *ast.ObjectList) []Output {
 			ret = append(ret, Output{
 				Name:        name,
 				Description: strings.TrimSpace(desc),
+			})
+		}
+	}
+
+	return ret
+}
+
+
+
+// Outputs returns all outputs from `list`.
+func providers(list *ast.ObjectList) [] Provider{
+	var ret []Provider
+	var version = "Latest"
+	for _, item := range list.Items {
+		if is(item, "provider") {
+			name, _ := strconv.Unquote(item.Keys[1].Token.Text)
+			if name == "" {
+				name = item.Keys[1].Token.Text
+			}
+			items := item.Val.(*ast.ObjectType).List.Items
+			var desc string
+			switch {
+			case description(items) != "":
+				desc = description(items)
+			case item.LeadComment != nil:
+				desc = comment(item.LeadComment.List)
+			}
+			if v := get(items, "description"); v != nil {
+				version = v.Literal
+			}
+			ret = append(ret, Provider{
+				Name:        name,
+				Description: desc,
+				Verison: strings.TrimSpace(version),
 			})
 		}
 	}
